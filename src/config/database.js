@@ -1,14 +1,15 @@
 const { Sequelize } = require("sequelize");
 
 const sequelize = new Sequelize(
-    'boxbox_dev',  //db adı
-    'sinem', 
-    null, //şifre yok (default)
+    process.env.DB_NAME,
+    process.env.DB_USER,
+    process.env.DB_PASSWORD || null,
     {
-        host: 'localhost',
-        port: 5432,
+        host: process.env.DB_HOST,
+        port: process.env.DB_PORT || 5432,
         dialect: 'postgres',
-        logging: console.log //şu an görmek istiyorum sonra kapa!!
+        logging: console.log
     }
 );
+
 module.exports = sequelize;
