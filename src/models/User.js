@@ -10,12 +10,19 @@ const User = sequelize.define('User', {
     username: {
         type: DataTypes.STRING(30),
         allowNull: false,
-        unique: true
+        unique: true,
+        validate: {
+        len: [3, 30],
+        is: /^[a-zA-Z0-9_]+$/ 
+        }
     },
     email: {
         type: DataTypes.STRING,
         allowNull: false,
-        unique:true
+        unique:true,
+        validate: {
+            isEmail: true
+        }
     },
     passwordHash: {
         type: DataTypes.STRING,
