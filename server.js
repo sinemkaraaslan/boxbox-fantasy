@@ -4,6 +4,7 @@ const sequelize = require('./src/config/database');
 const User = require('./src/models/User');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const authenticate = require('./src/middlewares/auth');
 
 
 const app = express();
@@ -64,6 +65,23 @@ app.post('/api/auth/login', async (req,res) =>{
             }
         })
     } catch (err){
+        console.error(err);
+        res.status(500).json({ error: err.message });
+    }
+})
+
+app.get('/api/auth/me', authenticate, async (req, res) => {
+    try{
+        const user = await User.findByPk(req.user.id);
+        if(!user){
+            return res.status(404).json({ error: 'Kullanıcı bulunamadı' });
+        }
+        res.json({
+            id: user.id,
+            username: user.username,
+            email: user.email
+        })
+    }catch (err){
         console.error(err);
         res.status(500).json({ error: err.message });
     }
