@@ -87,6 +87,37 @@ app.get('/api/auth/me', authenticate, async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 })
+//profil güncelleme
+app.patch('/api/auth/me', authenticate, async (req,res) => {
+    try {
+        const user = await User.findByPk(req.user.id);
+        if(!user){
+            return res.status(404).json({ error: 'Kullanıcı bulunamadı' });
+        }
+        //bu alanlar güncellenebilir
+        const allowed = ['favoriteDriver', 'favoriteTeam', 'bio', 'avatarUrl'];
+        const updates = {};
+        for (const key of allowed) {
+            if(req.body[key] !== undefined){
+                updates[key] = req.body[key];
+            }
+        }
+        await user.update(updates);
+
+        res.json({
+            id: user.id,
+            username: user.username,
+            email: user.email,
+            favoriteDriver: user.favoriteDriver,
+            favoriteTeam: user.favoriteTeam,
+            bio: user.bio,
+            avatarUrl: user.avatarUrl
+          });
+    } catch(err) {
+        console.error(err);
+        res.status(400).json({ error: err.message });
+    }
+})
 
 app.post('/api/leagues', authenticate, async (req, res) => {
     try{

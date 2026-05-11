@@ -27,7 +27,25 @@ const User = sequelize.define('User', {
     passwordHash: {
         type: DataTypes.STRING,
         allowNull: false
-    }
+    },
+    favoriteDriver: {
+        type: DataTypes.STRING(3)  //3 harfli driver kodu (VER, NOR, LEC gibi)
+      },
+      favoriteTeam: {
+        type: DataTypes.STRING(50)
+      },
+      bio: {
+        type: DataTypes.STRING(280),
+        validate: {
+          len: [0, 280]
+        }
+      },
+      avatarUrl: {
+        type: DataTypes.STRING,
+        validate: {
+          isUrl: true  // geçerli URL formatı
+        }
+      }
 }, {
     tableName: 'users'
 });
