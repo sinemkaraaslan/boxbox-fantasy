@@ -1,10 +1,11 @@
 require('dotenv').config();
 const express = require('express');
 const sequelize = require('./src/config/database');
-const User = require('./src/models/User');
+const { User, League, LeagueMember } = require('./src/models');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const authenticate = require('./src/middlewares/auth');
+const { generateInviteCode } = require('./src/utils/inviteCode');
 
 
 const app = express();
@@ -82,6 +83,138 @@ app.get('/api/auth/me', authenticate, async (req, res) => {
             email: user.email
         })
     }catch (err){
+        console.error(err);
+        res.status(500).json({ error: err.message });
+    }
+})
+
+app.post('/api/leagues', authenticate, async (req, res) => {
+    try{
+        const { name, description, isPublic } = req.body;
+
+        //benzersiz davet kodu üret
+        let InviteCode;
+        let attempts = 0;
+        do {
+            inviteCode = generateInviteCode();
+            const exists = await League.findOne({ where: {inviteCode} })
+            if (!exists) break;
+            attempts++;
+        }while(attempts < 5);
+
+        //ligi oluştur
+        const league = await League.create({
+            name,
+            description,
+            isPublic: isPublic || false,
+            inviteCode,
+            ownerId: req.user.id
+        });
+        //kurucu otomatik owner rolünde
+        await LeagueMember.create({
+            userId: req.user.id,
+            leagueId: league.id,
+            role: 'owner'
+        });
+        res.status(201).json(league);
+    }catch(err){
+        console.error(err);
+        res.status(400).json({ error: err.message });
+
+    }
+});
+//kullanıcının liglerini listele
+app.get('/api/leagues', authenticate, async (req, res) => {
+    try {
+        const user = await User.findByPk(req.user.id, {
+            include: [{
+                model: League,
+                as: 'leagues',
+                through: { attributes: ['role', 'totalPoints']}
+            }]
+        });
+        res.json(user.leagues);
+    } catch(err) {
+        console.error(err);
+        res.status(500).json({ error: err.message });
+    }
+})
+//lig detay
+app.get('/api/leagues/:id', authenticate, async (req, res) => {
+    try {
+        const league = await League.findByPk(req.params.id, {
+            include: [
+                { model: User, as: 'owner', attributes: ['id', 'username'] },
+                { 
+                  model: User, 
+                  as: 'members', 
+                  attributes: ['id', 'username'],
+                  through: { attributes: ['role', 'totalPoints'] }
+                }
+            ]
+        })
+        if (!league) {
+            return res.status(404).json({ error: 'Lig bulunamadı' })
+        }
+        //kullanıcı bu ligin üyesi mi ?
+        const isMember = league.members.some(m => m.id === req.user.id);
+        if( !isMember && !league.isPublic) {
+            return res.status(403).json({ error: 'Bu lige erişim yetkin yok' })
+        }
+        res.json(league);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: err.message});
+    }
+});
+// lige katıl (davet kodu ile)
+app.post('/api/leagues/join', authenticate, async (req, res) => {
+    try {
+        const { inviteCode } = req.body;
+
+        if(!inviteCode) {
+            return res.status(400).json({ error: 'Davet kodu gerekli' });
+        }
+        const league = await League.findOne({ where: {inviteCode} });
+        if(!league) {
+            return res.status(404).json({ error: 'Geçersiz davet kodu'});
+        }
+        // zaten üye mi kontrol et
+        const existing = await LeagueMember.findOne({ where: { userId: req.user.id, leagueId: league.id}});
+        if (existing) {
+            return res.status(409).json({ error: 'Bu lige zaten üyesiniz'})
+        }
+        // yeni üye olarak ekle
+        await LeagueMember.create({
+            userId: req.user.id,
+            leagueId: league.id,
+            role: 'member'
+        });
+
+        res.status(201).json({
+            message: 'Lige başarıyla katıldın',
+            league: { id: league.id, name: league.name }
+        });
+    }catch (err){
+        console.error(err);
+        res.status(500).json({ error: err.message });
+    }
+})
+//ligi sil
+app.delete('/api/leagues/:id', authenticate, async (req, res) => {
+    try{
+        const league = await League.findByPk(req.params.id);
+
+        if(!league){
+            return res.status(404).json({ error: 'Lig bulunamadı' });
+        }
+        // ownership check --sadece owner silebilir
+        if(league.ownerId !== req.user.id) {
+            return res.status(403).json({ error: 'Sadece lig sahibi silebilir'})
+        }
+        await league.destroy();
+        res.json({ message: 'Lig silindi' });
+    } catch(err) {
         console.error(err);
         res.status(500).json({ error: err.message });
     }
