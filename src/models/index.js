@@ -3,6 +3,7 @@ const sequelize = require('../config/database');
 const User = require('./User');
 const League = require('./League');
 const LeagueMember = require('./LeagueMember');
+const Race = require('./Race');
 
 // User -- League (many to many through LeagueMember)
 User.belongsToMany(League, { through: LeagueMember, foreignKey: 'userId', as: 'leagues' });
@@ -16,5 +17,6 @@ module.exports = {
     sequelize,
     User,
     League,
-    LeagueMember
+    LeagueMember,
+    Race
 };

@@ -1,11 +1,13 @@
 require('dotenv').config();
 const express = require('express');
 const sequelize = require('./src/config/database');
-const { User, League, LeagueMember } = require('./src/models');
+const { User, League, LeagueMember, Race } = require('./src/models');
+const { fetchSeasonRaces, fetchRaceResults } = require('./src/services/jolpicaService');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const authenticate = require('./src/middlewares/auth');
 const { generateInviteCode } = require('./src/utils/inviteCode');
+
 
 
 const app = express();
@@ -250,6 +252,113 @@ app.delete('/api/leagues/:id', authenticate, async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 })
+// ---------- YARIŞLARI LISTELE ----------
+app.get('/api/races', authenticate, async (req, res) => {
+    try {
+      const season = req.query.season ? parseInt(req.query.season) : null;
+  
+      const where = season ? { season } : {};
+  
+      const races = await Race.findAll({
+        where,
+        order: [['season', 'DESC'], ['round', 'ASC']]
+      });
+  
+      res.json(races);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+  
+  // ---------- TEK YARIŞ DETAY ----------
+  app.get('/api/races/:id', authenticate, async (req, res) => {
+    try {
+      const race = await Race.findByPk(req.params.id);
+      if (!race) {
+        return res.status(404).json({ error: 'Yarış bulunamadı' });
+      }
+      res.json(race);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+  
+  //SEZON YARIŞLARINI JOLPICADAN ÇEK VE KAYDET
+  // (admin/seed endpoint — demo için)
+  app.post('/api/races/seed/:season', authenticate, async (req, res) => {
+    try {
+      const season = parseInt(req.params.season);
+      
+      if (!season || season < 2020 || season > 2026) {
+        return res.status(400).json({ error: 'Geçersiz sezon' });
+      }
+  
+      const racesData = await fetchSeasonRaces(season);
+  
+      const created = [];
+      const skipped = [];
+  
+      for (const raceData of racesData) {
+        // Zaten var mı kontrol et
+        const existing = await Race.findOne({
+          where: { season: raceData.season, round: raceData.round }
+        });
+  
+        if (existing) {
+          skipped.push(`Round ${raceData.round}: ${raceData.name}`);
+        } else {
+          const race = await Race.create(raceData);
+          created.push(race);
+        }
+      }
+  
+      res.json({
+        message: `${season} sezonu yüklendi`,
+        created: created.length,
+        skipped: skipped.length,
+        skippedDetails: skipped
+      });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+  
+  //BIR YARIŞIN SONUÇLARINI JOLPICA'DAN ÇEK VE KAYDET
+  app.post('/api/races/:id/fetch-results', authenticate, async (req, res) => {
+    try {
+      const race = await Race.findByPk(req.params.id);
+      if (!race) {
+        return res.status(404).json({ error: 'Yarış bulunamadı' });
+      }
+  
+      if (race.isCompleted) {
+        return res.status(409).json({ error: 'Yarış zaten sonuçlanmış' });
+      }
+  
+      //Jolpicadan sonuçları çek
+      const results = await fetchRaceResults(race.season, race.round);
+  
+      //Race'i güncelle
+      await race.update({
+        finalResults: results.finalResults,
+        poleSitter: results.poleSitter,
+        fastestLap: results.fastestLap,
+        dnfCount: results.dnfCount,
+        isCompleted: true
+      });
+  
+      res.json({
+        message: 'Sonuçlar başarıyla kaydedildi',
+        race
+      });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: err.message });
+    }
+  });
 
 async function start(){
     try{
