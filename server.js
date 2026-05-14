@@ -1,13 +1,13 @@
 require('dotenv').config();
 const express = require('express');
 const sequelize = require('./src/config/database');
-const { User, League, LeagueMember, Race } = require('./src/models');
+const { User, League, LeagueMember, Race, Prediction } = require('./src/models');
 const { fetchSeasonRaces, fetchRaceResults } = require('./src/services/jolpicaService');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const authenticate = require('./src/middlewares/auth');
 const { generateInviteCode } = require('./src/utils/inviteCode');
-
+const { isPredictionOpen } = require('./src/services/scoringService');
 
 
 const app = express();
@@ -354,6 +354,189 @@ app.get('/api/races', authenticate, async (req, res) => {
         message: 'Sonuçlar başarıyla kaydedildi',
         race
       });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+//yeni tahmin oluştur
+app.post('/api/leagues/:leagueId/races/:raceId/predictions', authenticate, async (req,res) => {
+    try {
+        const { leagueId, raceId } = req.params;
+        const { podiumOrder, poleSitter, fastestLap, dnfCount } = req.body;
+
+        //lig var mı
+        const league = await League.findByPk(leagueId);
+        if(!league){
+            return res.status(404).json({ error: 'Lig bulunamadı' })
+        }
+
+        //kullanıcı bu ligin üyesi mi
+        const membership = await LeagueMember.findOne({
+            where: { userId: req.user.id, leagueId }
+        });
+
+        //yarış var mı
+        const race = await Race.findByPk(raceId);
+        if(!race){
+            return res.status(404).json({ error: 'Yarış bulunamadı'});
+        }
+
+        //tahmin süresi hala açık mı
+        if (!isPredictionOpen(race)){
+            return res.status(403).json({ error: 'Tahmin süresi kapandı'})
+        }
+
+        //zaten tahmin yapmış mı
+        const existing = await Prediction.findOne({
+            where: { userId: req.user.id, raceId, leagueId }
+        });
+        if (existing) {
+            return res.status(409).json({ error: 'Bu yarış için zaten tahmin yapmışsın. Güncellemek için PUT kullan'});     
+        }
+
+        //tahmini oluştur
+        const prediction = await Prediction.create({
+            userId: req.user.id,
+            raceId,
+            leagueId,
+            podiumOrder,
+            poleSitter,
+            fastestLap,
+            dnfCount
+        });
+        res.status(201).json(prediction);
+    } catch (err) {
+        console.error(err);
+        res.status(400).json({ error: err.message });
+    }
+});
+
+//Kullanıcının bir yarış için tahminini getir
+app.get('/api/leagues/:leagueId/races/:raceId/predictions/me', authenticate, async (req, res) => {
+    try {
+        const { leagueId, raceId } = req.params;
+
+        const prediction = await Prediction.findOne({
+            where: { userId: req.user.id, raceId, leagueId }
+        });
+
+        if(!prediction){
+            return res.status(404).json({ error: 'Bu yarış için henüz tahmin yapmadın.'});
+        }
+        res.json(prediction);
+    } catch(err){
+        res.status(500).json({ error: err.message });
+    }
+});
+
+//bir yarış için ligdeki tüm tahminleri getir -yarış sonrası
+app.get('/api/leagues/:leagueId/races/:raceId/predictions', authenticate, async (req, res) => {
+    try {
+        const { leagueId, raceId } = req.params;
+        
+        //üyelik kontrolü
+        const membership = await LeagueMember.findOne({
+            where: { userId: req.user.id, leagueId }
+        });
+        if(!membership){
+            return res.status(403).json({ error: 'Bu lige üye değilsin' })
+        }
+
+        //yarış kontrol
+        const race = await Race.findByPk(raceId);
+        if(!race){
+            return res.status(404).json({ error: 'Yarış bulunamadı'})
+        }
+
+        //yarış başlamadıysa diğer tahminleri gösterme -haksızlık olmasın fln
+        if(isPredictionOpen(race)){
+            return res.status(403).json({ error: 'Diğer tahminler yarış kilitlenmeden gösterilmez' });
+        }
+        const predictions = await Prediction.findAll({
+            where: { leagueId, raceId },
+            include: [{
+                model: User,
+                attributes: ['id', 'username']
+            }],
+            order: [['pointsAwarded', 'DESC']]
+        });
+        res.json(predictions);
+    } catch(err){
+        console.error(err);
+        res.status(500).json({ error: err.message });
+    }
+})
+//tahmini güncelle (kilit açıksa)
+app.put('/api/predictions/:id', authenticate, async (req, res) => {
+    try {
+        const prediction = await Prediction.findByPk(req.params.id);
+        if(!prediction){
+            return res.status(404).json({ error: 'Tahmin bulunamadı' });
+        }
+        //ownership check
+        if(prediction.userId !== req.user.id){
+            return res.status(403).json({ error: 'Sadece kendi tahminini güncelleyebilirsin' });
+        }
+        //racei çek, kilit durumunu kontrol et
+        const race = await Race.findByPk(prediction.raceId);
+        if(!isPredictionOpen(race)){
+            return res.status(403).json({ error: 'Tahmin süresi kapandı, güncelleyemezsin' });
+        }
+        //whitelist update
+        const allowed = ['podiumOrder', 'poleSitter', 'fastestLap', 'dnfCount'];
+        const updates = {};
+        for (const key of allowed){
+            if (req.body[key] !== undefined){
+                updates[key] = req.body[key];
+            }
+        }
+        await prediction.update(updates);
+        res.json(prediction);
+    } catch(err){
+        console.error(err);
+        res.status(400).json({ error: err.message });
+    }
+});
+//Tahmini sil (kilit açıksa)
+app.delete('/api/predictions/:id', authenticate, async (req, res) => {
+    try {
+        const prediction = await Prediction.findByPk(req.params.id);
+        if (!prediction) {
+            return res.status(404).json({ error: 'Tahmin bulunamadı' });
+        }
+        // ownership check
+        if (prediction.userId !== req.user.id) {
+            return res.status(403).json({ error: 'Sadece kendi tahminini silebilirsin' });
+        }
+      
+        const race = await Race.findByPk(prediction.raceId);
+        if (!isPredictionOpen(race)) {
+            return res.status(403).json({ error: 'Tahmin süresi kapandı, silinemez' });
+        }
+      
+        await prediction.destroy();
+        res.json({ message: 'Tahmin silindi' });
+
+    } catch(err){
+        console.error(err);
+        res.status(500).json({ error: err.message });
+    }
+})
+//kullanıcının tüm tahminleri (tüm liglerden)
+app.get('/api/users/me/predictions', authenticate, async (req, res) => {
+    try {
+      const predictions = await Prediction.findAll({
+        where: { userId: req.user.id },
+        include: [
+          { model: Race, attributes: ['id', 'name', 'season', 'round', 'raceDate', 'isCompleted'] },
+          { model: League, attributes: ['id', 'name'] }
+        ],
+        order: [[Race, 'raceDate', 'DESC']]
+      });
+  
+      res.json(predictions);
     } catch (err) {
       console.error(err);
       res.status(500).json({ error: err.message });
