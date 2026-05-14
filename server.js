@@ -8,6 +8,7 @@ const jwt = require('jsonwebtoken');
 const authenticate = require('./src/middlewares/auth');
 const { generateInviteCode } = require('./src/utils/inviteCode');
 const { isPredictionOpen } = require('./src/services/scoringService');
+const { calculatePoints } = require('./src/services/scoringService');
 
 
 const app = express();
@@ -542,6 +543,88 @@ app.get('/api/users/me/predictions', authenticate, async (req, res) => {
       res.status(500).json({ error: err.message });
     }
   });
+
+// BİR YARIŞ İÇİN TÜM TAHMİNLERİ PUANLA 
+/**
+ * Yarışın sonuçları girilmiş olmalı
+ * Bu yarıştaki tüm tahminleri çek
+ * her biri için scoring service ile puan hesapla
+ * LeaugeMember.totalPoints i güncelle
+ */
+app.post('/api/races/:id/calculate-points', authenticate, async (req, res) => {
+    try {
+        const race = await Race.findByPk(req.params.id);
+        if(!race) {
+            return res.status(404).json({ error: 'Yarış bulunamadı' });
+        }
+        //yarış sonuçlanmamışsa puan hesaplanamaz
+        if(!race.isCompleted || !race.finalResults){
+            return res.status(400).json({ error: 'Yarış henüz sonuçlanmamış. Önce sonuçları çek.'})
+        }
+        //bu yarış için yapılmış tüm tahminleri çek 
+        const predictions = await Prediction.findAll({
+            where: { raceId: race.id }
+        });
+        if(predictions.length === 0){
+            return res.json({
+                message: 'Bu yarış için tahmin yapılmamış',
+                scored: 0
+            });
+        }
+        //her tahmin için puan hesapla
+        const actual = {
+            finalResults: race.finalResults,
+            poleSitter: race.poleSitter,
+            fastestLap: race.fastestLap,
+            dnfCount: race.dnfCount
+        };
+        const results = [];
+
+        for (const prediction of predictions){
+            const points = calculatePoints({
+                podiumOrder: prediction.podiumOrder,
+                poleSitter: prediction.poleSitter,
+                fastestLap: prediction.fastestLap,
+                dnfCount: prediction.dnfCount
+            },
+            actual
+            )
+             //tahmin kaydını güncelle
+            await prediction.update({
+                pointsAwarded: points.total,
+                pointsBreakdown: points
+            })
+            //LeagueMember.totalPointsi arttır
+            const member = await LeagueMember.findOne({
+                where: {
+                    userId: prediction.userId,
+                    leagueId: prediction.leagueId
+                }
+            });
+            if(member) {
+                await member.update({
+                    totalPoints: member.totalPoints + points.total
+                });
+            }
+            results.push({
+                predictionId: prediction.id,
+                userId: prediction.userId,
+                points: points.total,
+                breakdown: points
+            });
+            
+        }
+        res.json({
+            message: 'Puanlar hesaplandı',
+            raceName: race.name,
+            scored: results.length,
+            results
+        });
+    } catch(err){
+        console.error(err);
+        res.status(500).json({ error: err.message});
+    }
+});
 
 async function start(){
     try{
