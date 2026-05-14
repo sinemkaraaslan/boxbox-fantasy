@@ -5,9 +5,12 @@ app.use(express.json());
 
 //Routeları bağla
 const authRoutes = require('./routes/authRoutes');
-app.use('/api/auth', authRoutes);
+const leagueRoutes = require('./routes/leagueRoutes');
 
-//404 fallback
+app.use('/api/auth', authRoutes);
+app.use('/api/leagues', leagueRoutes);
+
+//404
 app.use((req, res) => {
   res.status(404).json({ error: 'Endpoint bulunamadı' });
 });
