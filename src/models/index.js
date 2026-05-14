@@ -26,6 +26,14 @@ Prediction.belongsTo(Race, { foreignKey: 'raceId' });
 League.hasMany(Prediction, { foreignKey: 'leagueId' });
 Prediction.belongsTo(League, { foreignKey: 'leagueId' });
 
+// LeagueMember - User (doğrudan - standings için)
+LeagueMember.belongsTo(User, { foreignKey: 'userId' });
+User.hasMany(LeagueMember, { foreignKey: 'userId' });
+
+// LeagueMember - League (doğrudan)
+LeagueMember.belongsTo(League, { foreignKey: 'leagueId' });
+League.hasMany(LeagueMember, { foreignKey: 'leagueId' });
+
 module.exports = {
     sequelize,
     User,

@@ -9,6 +9,7 @@ const authenticate = require('./src/middlewares/auth');
 const { generateInviteCode } = require('./src/utils/inviteCode');
 const { isPredictionOpen } = require('./src/services/scoringService');
 const { calculatePoints } = require('./src/services/scoringService');
+const { computeStandings } = require('./src/services/scoringService');
 
 
 const app = express();
@@ -625,6 +626,90 @@ app.post('/api/races/:id/calculate-points', authenticate, async (req, res) => {
         res.status(500).json({ error: err.message});
     }
 });
+
+//LİG SIRALAMASI
+app.get('/api/leagues/:id/standings', authenticate, async (req,res) => {
+    try{
+        const leagueId = req.params.id;
+
+        //lig var mı
+        const league =await League.findByPk(leagueId);
+        if(!league){
+            return res.status(404).json({ error: 'Lig bulunamadı' });
+        }
+
+        //kullanıcı üye mi
+        const membership = await LeagueMember.findOne({
+            where: { userId: req.user.id, leagueId }
+        });
+        if(!membership && !league.isPublic){
+            return res.status(403).json({ error: 'Bu lige erişim yetkin yok' });
+        }
+
+        //lig üyelerini ve user bilgilerini birlikte çek
+        const members = await LeagueMember.findAll({
+            where: { leagueId },
+            include: [{
+                model: User,
+                attributes: ['id', 'username']
+            }]
+        })
+        //computeStandings in beklediği formata çevir
+        const formatted = members.map(m=> ({
+            userId: m.User.id,
+            username: m.User.username,
+            totalPoints: m.totalPoints
+        }))
+
+        const standings = computeStandings(formatted);
+
+        res.json({
+            leagueId: league.id,
+            leagueName: league.name,
+            standings
+        })
+    } catch (err){
+        console.error(err);
+        res.status(500).json({ error: err.message });
+    }
+})
+
+//kullanıcının kişisel istatistikleri
+app.get('/api/users/me/stats', authenticate, async(req, res) => {
+    try {
+        //kullanıcının tüm tahminleri
+        const predictions = await Prediction.findAll({
+            where: { userId: req.user.id }
+        });
+        //toplam tahmin sayısı
+        const totalPredictions = predictions.length;
+
+        //toplam kazanılan puan
+        let totalPoints = 0;
+        for (const p of predictions) {
+            totalPoints += p.pointsAwarded || 0;
+        }
+
+        // kullanıcı kaç ligde
+        const leagueCount = await LeagueMember.count({
+            where: { userId: req.user.id }
+        });
+        //kullanıcı profili
+        const user = await User.findByPk(req.user.id);
+
+        res.json({
+            username: user.username,
+            favoriteDriver: user.favoriteDriver,
+            favoriteTeam: user.favoriteTeam,
+            totalPredictions,
+            totalPoints,
+            leagueCount
+        })
+    } catch(err){
+        console.error(err);
+        res.status(500).json({ error: err.message });
+    }
+})
 
 async function start(){
     try{
