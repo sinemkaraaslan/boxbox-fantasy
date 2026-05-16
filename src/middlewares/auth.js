@@ -13,7 +13,7 @@ function authenticate(req, res, next){
         //req user'a kullanıcı id'sini koy 
         req.user = { id: payload.sub }; 
         next();
-    } catch (err){
+    }catch(err){
         if(err.name === 'TokenExpiredError'){
             return res.status(401).json({error: 'Token süresi dolmuş' });
         }
