@@ -160,4 +160,35 @@ async function remove(req, res) {
   }
 }
 
-module.exports = { create, list, detail, join, remove };
+/**
+ * @swagger
+ * /leagues/{id}/standings:
+ *   get:
+ *     summary: Lig sıralamasını getir
+ *     tags: [Leagues]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *         description: Lig ID
+ *     responses:
+ *       200: { description: Üyeler puana göre sıralı }
+ *       404: { description: Lig bulunamadı }
+ */
+async function standings(req, res) {
+    try {
+      const result = await leagueService.getStandings(req.params.id);
+      res.json(result);
+    }catch(err){
+      if (err.message === 'LEAGUE_NOT_FOUND') {
+        return res.status(404).json({ error: 'Lig bulunamadı' });
+      }
+      console.error(err);
+      res.status(500).json({ error: err.message });
+    }
+  }
+
+module.exports = { create, list, detail, join, remove, standings };

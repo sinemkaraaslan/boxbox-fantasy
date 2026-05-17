@@ -42,6 +42,27 @@ async function create(req, res) {
   }
 }
 
+/**
+ * @swagger
+ * /leagues/{leagueId}/races/{raceId}/predictions/me:
+ *   get:
+ *     summary: Bu yarış için kendi tahminim
+ *     tags: [Predictions]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: leagueId
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *       - in: path
+ *         name: raceId
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200: { description: Tahmin detayları }
+ *       404: { description: Tahmin yok }
+ */
 async function getMine(req,res) {
   try {
     const { leagueId, raceId } = req.params;
@@ -62,6 +83,24 @@ async function getAll(req,res) {
   }
 }
 
+/**
+ * @swagger
+ * /predictions/{id}:
+ *   put:
+ *     summary: Tahmini güncelle (lock kapanmadan)
+ *     tags: [Predictions]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200: { description: Güncellendi }
+ *       403: { description: Sahibi değilsin veya kilit kapandı }
+ *       404: { description: Tahmin bulunamadı }
+ */
 async function update(req,res) {
   try {
     const prediction = await predictionService.updatePrediction(req.params.id, req.user.id, req.body);
@@ -71,6 +110,25 @@ async function update(req,res) {
   }
 }
 
+
+/**
+ * @swagger
+ * /predictions/{id}:
+ *   delete:
+ *     summary: Tahmini sil (lock kapanmadan)
+ *     tags: [Predictions]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200: { description: Silindi }
+ *       403: { description: Sahibi değilsin }
+ *       404: { description: Bulunamadı }
+ */
 async function remove(req,res) {
   try {
     await predictionService.deletePrediction(req.params.id, req.user.id);

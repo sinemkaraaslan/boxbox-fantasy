@@ -1,6 +1,19 @@
 const userService = require('../services/userService');
 const predictionService = require('../services/predictionService');
 
+/**
+ * @swagger
+ * /users/me/stats:
+ *   get:
+ *     summary: Kullanıcının istatistiklerini getir
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Toplam puan, tahmin sayısı, lig sayısı
+ *       404: { description: Kullanıcı bulunamadı }
+ */
 async function getStats(req, res) {
   try{
     const stats = await userService.getUserStats(req.user.id);
@@ -14,6 +27,17 @@ async function getStats(req, res) {
   }
 }
 
+/**
+ * @swagger
+ * /users/me/predictions:
+ *   get:
+ *     summary: Kullanıcının tüm tahminleri (lig ve yarış bilgisiyle)
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Tahmin geçmişi }
+ */
 async function getMyPredictions(req, res) {
   try{
     const predictions = await predictionService.getUserAllPredictions(req.user.id);
