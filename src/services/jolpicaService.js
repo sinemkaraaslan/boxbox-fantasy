@@ -62,10 +62,12 @@ async function fetchRaceResults(season, round){
         const fastestLapDriver = results.find(r => r.FastestLap?.rank === '1');
         const fastestLap = fastestLapDriver ? fastestLapDriver.Driver.code : null;
 
-        //DNF sayısı - statusu "Finished" veya "+X Lap" olmayan herkes
+        //DNF sayısı - statusu "Finished", "Lapped" veya "+X Lap" olmayan herkes
         const dnfCount = results.filter(r => {
             const status = r.status;
-            return status !== 'Finished' && !status.startsWith('+');
+            return status !== 'Finished' 
+                && status !== 'Lapped' 
+                && !status.startsWith('+');
         }).length;
 
         //Pole sitter - sıralama turlarından
