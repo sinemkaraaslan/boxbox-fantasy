@@ -8,6 +8,7 @@ const { registerRules, loginRules, updateProfileRules } = require('../validators
 
 router.post('/register', registerRules, validate, authController.register);
 router.post('/login', loginRules, validate, authController.login);
+router.post('/logout', authController.logout);
 
 router.get('/me', authenticate, authController.getMe);
 router.patch('/me', authenticate, updateProfileRules, validate, authController.updateMe);

@@ -1,5 +1,13 @@
 const authService = require('../services/authService');
 
+// Cookie ayarları 
+const COOKIE_OPTIONS = {
+  httpOnly: true,                    //JavaScript erişemez (XSS koruması fln)
+  secure: false,                     
+  sameSite: 'strict',                //CSRF koruması
+  maxAge: 24 * 60 * 60 * 1000        //24 saat (millisaniye)
+};
+
 /**
  * @swagger
  * /auth/register:
@@ -18,13 +26,20 @@ const authService = require('../services/authService');
  *               email:    { type: string, example: "sinem@test.com" }
  *               password: { type: string, example: "abc12345" }
  *     responses:
- *       201: { description: Kullanıcı oluşturuldu }
+ *       201: { description: Kullanıcı oluşturuldu, token cookie olarak set edildi }
  *       400: { description: Validation hatası }
  */
 async function register(req, res) {
   try {
     const result = await authService.registerUser(req.body);
-    res.status(201).json(result);
+
+    //Tokenı httpOnly cookie olarak set et
+    if (result.token) {
+      res.cookie('boxbox_token', result.token, COOKIE_OPTIONS);
+    }
+
+    //Tokenı response body'de göndermiyoruz, sadece user dönüyor
+    res.status(201).json({ user: result.user });
   } catch (err) {
     console.error(err);
     res.status(400).json({ error: err.message });
@@ -48,13 +63,18 @@ async function register(req, res) {
  *               email: { type: string }
  *               password: { type: string }
  *     responses:
- *       200: { description: Token ve kullanıcı bilgisi }
+ *       200: { description: Kullanıcı bilgisi, token cookie olarak set edildi }
  *       401: { description: Geçersiz email veya şifre }
  */
 async function login(req, res) {
   try {
     const result = await authService.loginUser(req.body);
-    res.json(result);
+
+    //Tokenı httpOnly cookie olarak set et
+    res.cookie('boxbox_token', result.token, COOKIE_OPTIONS);
+
+    //Sadece user dön
+    res.json({ user: result.user });
   } catch (err) {
     if (err.message === 'INVALID_CREDENTIALS') {
       return res.status(401).json({ error: 'Geçersiz email veya şifre' });
@@ -62,6 +82,20 @@ async function login(req, res) {
     console.error(err);
     res.status(500).json({ error: err.message });
   }
+}
+
+/**
+ * @swagger
+ * /auth/logout:
+ *   post:
+ *     summary: Çıkış yap (cookie'yi temizler)
+ *     tags: [Auth]
+ *     responses:
+ *       200: { description: Çıkış yapıldı }
+ */
+async function logout(req, res) {
+  res.clearCookie('boxbox_token');
+  res.json({ message: 'Çıkış yapıldı' });
 }
 
 /**
@@ -122,4 +156,4 @@ async function updateMe(req, res) {
   }
 }
 
-module.exports = { register, login, getMe, updateMe };
+module.exports = { register, login, logout, getMe, updateMe };
