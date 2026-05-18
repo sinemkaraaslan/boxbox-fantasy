@@ -114,10 +114,31 @@ async function deleteLeague(leagueId, userId) {
   return true;
 }
 
+async function getStandings(leagueId) {
+    const league = await League.findByPk(leagueId);
+    if (!league) throw new Error('LEAGUE_NOT_FOUND');
+  
+    const members = await LeagueMember.findAll({
+      where: { leagueId },
+      include: [{ model: User, attributes: ['id', 'username'] }],
+      order: [['totalPoints', 'DESC']]
+    });
+  
+    const standings = members.map((m, i) => ({
+      rank: i + 1,
+      userId: m.User.id,
+      username: m.User.username,
+      totalPoints: m.totalPoints
+    }));
+  
+    return { standings };
+  }
+
 module.exports = {
   createLeague,
   getUserLeagues,
   getLeagueById,
   joinLeague,
-  deleteLeague
+  deleteLeague,
+  getStandings
 };

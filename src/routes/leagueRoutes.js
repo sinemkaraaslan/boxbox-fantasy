@@ -14,6 +14,6 @@ router.get('/', leagueController.list);
 router.post('/join', joinLeagueRules, validate, leagueController.join); 
 router.get('/:id', leagueController.detail);
 router.delete('/:id', leagueController.remove);
-//router.get('/:id/standings', leagueController.standings);
+router.get('/:id/standings', leagueController.standings);
 
 module.exports = router;
