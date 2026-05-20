@@ -8,7 +8,7 @@ Pole sitter tahmini gerçek F1 takvimine uygun şekilde **qualifying'den önce**
 
 ---
 
-## 📊 Proje Özeti
+## Proje Özeti
 
 | | |
 |---|---|
@@ -81,7 +81,7 @@ PostgreSQL
 
 ---
 
-## 📁 Proje Yapısı
+## Proje Yapısı
 
 ```
 boxbox/
@@ -122,13 +122,14 @@ boxbox/
     │   └── validate.js        # express-validator wrapper
     │
     ├── validators/            # Endpoint bazlı validation kuralları
-    │   ├── authValidators.js
-    │   ├── leagueValidators.js
-    │   ├── raceValidators.js
-    │   └── predictionValidators.js
+    │   ├── authValidator.js
+    │   ├── leagueValidator.js
+    │   ├── raceValidator.js
+    │   └── predictionValidator.js
     │
     ├── services/              # İş mantığı (test edilebilir)
     │   ├── authService.js
+    │   ├── userService.js
     │   ├── leagueService.js
     │   ├── raceService.js
     │   ├── predictionService.js
@@ -327,7 +328,7 @@ Yarış başlangıcından **1 saat önce**. Bu kilit kapandıktan sonra:
 - ❌ DNF sayısı tahmini değiştirilemez
 - ❌ Tahmin silinemez
 
-### 2. qualifyingLockAt (Pole kilidi) ⭐
+### 2. qualifyingLockAt (Pole kilidi) 
 
 **Qualifying başlangıcı**. Gerçek F1 takviminde qualifying yarıştan **bir gün önce** yapılır, pole sitter o zaman belli olur. Bu yüzden pole tahmini ayrı kilitlenir.
 
@@ -626,3 +627,4 @@ GitHub: [@sinemkaraaslan](https://github.com/sinemkaraaslan)
 Bahar 2026 Dönemi · Arel Üniversitesi
 
 Yarış verileri Jolpica F1 API'sinden çekilmektedir.
+
