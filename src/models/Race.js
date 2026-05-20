@@ -34,6 +34,11 @@ const Race = sequelize.define('Race', {
     type: DataTypes.DATE,
     allowNull: false
   },
+  //YENİ: Pole tahminleri için ayrı kilit (qualifying başlamadan önce)
+  qualifyingLockAt: {
+    type: DataTypes.DATE,
+    allowNull: true  //Eski yarışlar için null olabilir
+  },
   // Yarış sonuçları (yarış bitince doldurulacak)
   finalResults: {
     type: DataTypes.JSONB  // sıralı driver kodları: ["VER", "NOR", "LEC" gibi]

@@ -1,6 +1,12 @@
 const { Prediction, League, LeagueMember, Race, User } = require('../models');
 const { isPredictionOpen, calculatePoints } = require('./scoringService');
 
+// Pole sitter için ayrı kilit kontrolü (qualifying başlamadan önce)
+function isQualifyingOpen(race, now = new Date()) {
+  if (!race.qualifyingLockAt) return true; // Eski yarışlarda yoksa, açık say
+  return now < new Date(race.qualifyingLockAt);
+}
+
 //TAHMİN OLUŞTUR -tüm kontrollerle birlikte
 async function createPrediction(userId, leagueId, raceId, data) {
   //Lig var mı
@@ -23,9 +29,16 @@ async function createPrediction(userId, leagueId, raceId, data) {
     throw new Error('RACE_NOT_FOUND');
   }
 
-  //Tahmin süresi açık mı
+  //Tahmin süresi açık mı (genel kilit - podium, fastest lap, DNF için)
   if(!isPredictionOpen(race)){
     throw new Error('PREDICTION_CLOSED');
+  }
+
+  //Pole için ayrı kilit - qualifying başladıysa pole girilemez
+  if(!isQualifyingOpen(race)){
+    if(data.poleSitter !== undefined){
+      throw new Error('QUALIFYING_CLOSED');
+    }
   }
 
   //Zaten tahmin var mı
@@ -102,6 +115,13 @@ async function updatePrediction(predictionId, userId, updates) {
   const race = await Race.findByPk(prediction.raceId);
   if (!isPredictionOpen(race)) {
     throw new Error('PREDICTION_CLOSED');
+  }
+
+  //Pole kilidi geçtiyse pole güncellenemez
+  if(!isQualifyingOpen(race)){
+    if(updates.poleSitter !== undefined){
+      throw new Error('QUALIFYING_CLOSED');
+    }
   }
 
   //Whitelist -- güvenlik fln
@@ -217,5 +237,6 @@ module.exports = {
   updatePrediction,
   deletePrediction,
   getUserAllPredictions,
-  calculateRacePoints
+  calculateRacePoints,
+  isQualifyingOpen
 };

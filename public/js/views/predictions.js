@@ -1,5 +1,11 @@
 import { predictions, races, leagues, toast, DRIVERS, getDriverByCode, formatDate, escapeHtml } from '../api.js';
 
+// Pole sitter için qualifying kilidi açık mı?
+function isQualifyingOpen(race) {
+  if (!race.qualifyingLockAt) return true; // Eski yarışlarda yoksa açık say
+  return new Date() < new Date(race.qualifyingLockAt);
+}
+
 export async function renderPrediction(leagueId, raceId) {
   const app = document.getElementById('app');
 
@@ -69,11 +75,14 @@ export async function renderPrediction(leagueId, raceId) {
 
 //FORM VIEW
 function renderFormView(app, leagueId, raceId, league, race, existing) {
+  const qualifyingOpen = isQualifyingOpen(race);
+  
   const state = {
     podium: existing ? [...existing.podiumOrder] : Array(10).fill(null),
     poleSitter: existing?.poleSitter || null,
     fastestLap: existing?.fastestLap || null,
     dnfCount: existing?.dnfCount ?? 3,
+    qualifyingOpen, // ⭐ State'e ekledik
   };
 
   app.innerHTML = `
@@ -98,6 +107,12 @@ function renderFormView(app, leagueId, raceId, league, race, existing) {
         <span class="info-label">🔒 Tahmin Kilidi</span>
         <span class="info-value">${formatDate(race.predictionLockAt)}</span>
       </div>
+      ${race.qualifyingLockAt ? `
+        <div class="info-item">
+          <span class="info-label">🎯 Qualifying Kilidi</span>
+          <span class="info-value">${formatDate(race.qualifyingLockAt)}</span>
+        </div>
+      ` : ''}
       <div>
         <span class="badge badge-success">Tahmin Açık</span>
       </div>
@@ -129,8 +144,16 @@ function renderFormView(app, leagueId, raceId, league, race, existing) {
 
           <div class="bonus-grid">
             <div class="bonus-block">
-              <label>🎯 Pole Sitter <span style="color: var(--gold); font-weight: 700;">+15</span></label>
-              <div class="pill-row" id="poleRow"></div>
+              <label>
+                🎯 Pole Sitter <span style="color: var(--gold); font-weight: 700;">+15</span>
+                ${!qualifyingOpen ? '<span style="color: var(--racing-red); font-weight: 700; margin-left: 0.5rem;">🔒 Kilitli</span>' : ''}
+              </label>
+              ${!qualifyingOpen ? `
+                <div style="background: rgba(225, 6, 0, 0.08); border: 1px solid rgba(225, 6, 0, 0.3); border-radius: var(--radius-sm); padding: 0.6rem 0.8rem; margin-bottom: 0.5rem; font-size: 0.8rem; color: var(--racing-red);">
+                  Qualifying başladı, pole tahmini değiştirilemez
+                </div>
+              ` : ''}
+              <div class="pill-row" id="poleRow" ${!qualifyingOpen ? 'style="opacity: 0.5; pointer-events: none;"' : ''}></div>
             </div>
 
             <div class="bonus-block">
@@ -174,7 +197,7 @@ function renderFormView(app, leagueId, raceId, league, race, existing) {
   updateSummary(state);
 }
 
-//SLOTS (Top 10 pozisyonları)
+//SLOTS
 function renderSlots(state) {
   const list = document.getElementById('slotsList');
   list.innerHTML = state.podium.map((code, i) => {
@@ -283,16 +306,19 @@ function renderBonusPills(state) {
   poleRow.innerHTML = makePills(state.poleSitter);
   flRow.innerHTML = makePills(state.fastestLap);
 
-  poleRow.querySelectorAll('.pill').forEach(pill => {
-    pill.addEventListener('click', () => {
-      const state = window._predictState;
-      state.poleSitter = state.poleSitter === pill.dataset.code ? null : pill.dataset.code;
-      poleRow.querySelectorAll('.pill').forEach(p => {
-        p.classList.toggle('selected', p.dataset.code === state.poleSitter);
+  // ⭐ Pole pill'leri sadece qualifying açıksa interaktif
+  if (state.qualifyingOpen) {
+    poleRow.querySelectorAll('.pill').forEach(pill => {
+      pill.addEventListener('click', () => {
+        const state = window._predictState;
+        state.poleSitter = state.poleSitter === pill.dataset.code ? null : pill.dataset.code;
+        poleRow.querySelectorAll('.pill').forEach(p => {
+          p.classList.toggle('selected', p.dataset.code === state.poleSitter);
+        });
+        updateSummary(state);
       });
-      updateSummary(state);
     });
-  });
+  }
 
   flRow.querySelectorAll('.pill').forEach(pill => {
     pill.addEventListener('click', () => {
@@ -324,7 +350,10 @@ function updateSummary(state) {
   const podiumFull = state.podium.filter(Boolean).length === 10;
   const hasPole = !!state.poleSitter;
   const hasFL = !!state.fastestLap;
-  const valid = podiumFull && hasPole && hasFL;
+  
+  // ⭐ Qualifying kapalıysa pole zorunlu değil
+  const poleValid = state.qualifyingOpen ? hasPole : true;
+  const valid = podiumFull && poleValid && hasFL;
 
   const summary = document.getElementById('summaryText');
   const btn = document.getElementById('submitBtn');
@@ -332,12 +361,13 @@ function updateSummary(state) {
   if (!valid) {
     const missing = [];
     if (!podiumFull) missing.push(`${10 - state.podium.filter(Boolean).length} sürücü`);
-    if (!hasPole) missing.push('pole sitter');
+    if (state.qualifyingOpen && !hasPole) missing.push('pole sitter');
     if (!hasFL) missing.push('fastest lap');
     summary.innerHTML = `<span class="text-mute">Eksik:</span> <strong>${missing.join(', ')}</strong>`;
     btn.disabled = true;
   } else {
-    summary.innerHTML = `<span class="text-mute">Hazır.</span> <strong>10 sürücü + pole + fastest lap + ${state.dnfCount} DNF</strong>`;
+    const polePart = state.qualifyingOpen ? 'pole + ' : '';
+    summary.innerHTML = `<span class="text-mute">Hazır.</span> <strong>10 sürücü + ${polePart}fastest lap + ${state.dnfCount} DNF</strong>`;
     btn.disabled = false;
   }
 }
@@ -347,10 +377,14 @@ function attachSubmitHandlers(leagueId, raceId, existing, state) {
   submitBtn.addEventListener('click', async () => {
     const data = {
       podiumOrder: state.podium,
-      poleSitter: state.poleSitter,
       fastestLap: state.fastestLap,
       dnfCount: state.dnfCount
     };
+    
+    // ⭐ Pole sadece qualifying açıksa gönder
+    if (state.qualifyingOpen) {
+      data.poleSitter = state.poleSitter;
+    }
 
     submitBtn.disabled = true;
     submitBtn.textContent = 'Kaydediliyor...';
@@ -446,7 +480,7 @@ function renderResultsView(app, league, race, prediction) {
           `;
         }).join('')}
         <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.08); display: flex; gap: 1.5rem; flex-wrap: wrap; font-size: 0.85rem;">
-          <div><span class="text-mute">Pole:</span> <strong>${prediction.poleSitter}</strong> ${prediction.poleSitter === race.poleSitter ? '<span class="result-correct">✓</span>' : ''}</div>
+          <div><span class="text-mute">Pole:</span> <strong>${prediction.poleSitter || '—'}</strong> ${prediction.poleSitter === race.poleSitter ? '<span class="result-correct">✓</span>' : ''}</div>
           <div><span class="text-mute">FL:</span> <strong>${prediction.fastestLap}</strong> ${prediction.fastestLap === race.fastestLap ? '<span class="result-correct">✓</span>' : ''}</div>
           <div><span class="text-mute">DNF:</span> <strong>${prediction.dnfCount}</strong> ${prediction.dnfCount === race.dnfCount ? '<span class="result-correct">✓</span>' : ''}</div>
         </div>
@@ -473,7 +507,7 @@ function renderResultsView(app, league, race, prediction) {
   `;
 }
 
-//MISSED RACE VIEW — yarış bitti ama tahmin yapmadın
+//MISSED RACE VIEW
 function renderMissedRaceView(app, league, race) {
   const actual = race.finalResults || [];
 

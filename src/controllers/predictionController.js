@@ -9,6 +9,7 @@ function handleError(err, res) {
     'NOT_LEAGUE_MEMBER': [403, 'Bu lige üye değilsin'],
     'NOT_OWNER': [403, 'Sadece kendi tahminini değiştirebilirsin'],
     'PREDICTION_CLOSED': [403, 'Tahmin süresi kapandı'],
+    'QUALIFYING_CLOSED': [403, 'Qualifying başladı, pole sitter tahmini değiştirilemez'],
     'PREDICTIONS_LOCKED': [403, 'Diğer tahminler yarış kilitlenmeden gösterilemez'],
     'ALREADY_PREDICTED': [409, 'Bu yarış için zaten tahmin yapmışsın'],
     'RACE_NOT_COMPLETED': [400, 'Yarış henüz sonuçlanmamış']
