@@ -8,7 +8,7 @@ Pole sitter tahmini gerçek F1 takvimine uygun şekilde **qualifying'den önce**
 
 ---
 
-## Proje Özeti
+## 📊 Proje Özeti
 
 | | |
 |---|---|
@@ -81,7 +81,7 @@ PostgreSQL
 
 ---
 
-## Proje Yapısı
+## 📁 Proje Yapısı
 
 ```
 boxbox/
@@ -122,14 +122,13 @@ boxbox/
     │   └── validate.js        # express-validator wrapper
     │
     ├── validators/            # Endpoint bazlı validation kuralları
-    │   ├── authValidator.js
-    │   ├── leagueValidator.js
-    │   ├── raceValidator.js
-    │   └── predictionValidator.js
+    │   ├── authValidators.js
+    │   ├── leagueValidators.js
+    │   ├── raceValidators.js
+    │   └── predictionValidators.js
     │
     ├── services/              # İş mantığı (test edilebilir)
     │   ├── authService.js
-    │   ├── userService.js
     │   ├── leagueService.js
     │   ├── raceService.js
     │   ├── predictionService.js
@@ -316,7 +315,7 @@ Pozisyon farkına göre puan verilir:
 
 ---
 
-## Tahmin Kilitleme Sistemi
+## ⏱️ Tahmin Kilitleme Sistemi
 
 F1 takvimine uygun **iki ayrı kilit zamanı** vardır:
 
