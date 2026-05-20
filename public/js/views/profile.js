@@ -1,4 +1,4 @@
-import { users, auth, toast, DRIVERS, TEAMS, formatDateShort, escapeHtml } from '../api.js';
+import { users, auth, setCurrentUser, toast, DRIVERS, TEAMS, formatDateShort, escapeHtml } from '../api.js';
 
 export async function renderProfile(app) {
   const [profile, stats, myPredictions] = await Promise.all([
@@ -145,9 +145,23 @@ export async function renderProfile(app) {
     const btn = document.getElementById('profileSubmit');
     btn.disabled = true;
     btn.textContent = 'Kaydediliyor...';
-
+  
     try {
-      await auth.updateProfile(data);
+      const updated = await auth.updateProfile(data);
+      setCurrentUser(updated);
+  
+      // ⭐ Sadece profile-info kısmını yeniden çiz
+      const profileInfo = document.querySelector('.profile-info');
+      profileInfo.innerHTML = `
+        <h2>${escapeHtml(updated.username)}</h2>
+        <p class="profile-email">${escapeHtml(updated.email)}</p>
+        ${updated.bio ? `<p class="profile-bio">${escapeHtml(updated.bio)}</p>` : ''}
+        <div class="profile-favs">
+          ${updated.favoriteDriver ? `<span class="fav-pill driver">🏎️ ${updated.favoriteDriver}</span>` : ''}
+          ${updated.favoriteTeam ? `<span class="fav-pill team">🏁 ${updated.favoriteTeam}</span>` : ''}
+        </div>
+      `;
+  
       toast('Profil güncellendi 🏁', 'success');
       btn.disabled = false;
       btn.textContent = '💾 Kaydet';
