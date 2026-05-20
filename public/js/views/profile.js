@@ -17,6 +17,9 @@ export async function renderProfile(app) {
 
   const avg = stats.totalPredictions > 0 ? Math.round(stats.totalPoints / stats.totalPredictions) : 0;
 
+  // Orphan tahminleri (ligi veya yarışı silinmiş) filtrele — null guard
+  const validPredictions = myPredictions.filter(p => p.Race && p.League);
+
   app.innerHTML = `
     <div class="page-header">
       <div>
@@ -103,14 +106,14 @@ export async function renderProfile(app) {
       📜 Tahmin Geçmişi
     </div>
 
-    ${myPredictions.length === 0 ? `
+    ${validPredictions.length === 0 ? `
       <div class="empty-state" style="padding: 2rem;">
         <p class="text-mute">Henüz tahmin yapmadın.</p>
         <a href="#/races" class="btn btn-primary mt-2">Yarışlara Git</a>
       </div>
     ` : `
       <div class="grid grid-2">
-        ${myPredictions.map(p => `
+        ${validPredictions.map(p => `
           <div class="prediction-history-card">
             <div class="ph-head">
               <div>
@@ -145,12 +148,12 @@ export async function renderProfile(app) {
     const btn = document.getElementById('profileSubmit');
     btn.disabled = true;
     btn.textContent = 'Kaydediliyor...';
-  
+
     try {
       const updated = await auth.updateProfile(data);
       setCurrentUser(updated);
-  
-      // ⭐ Sadece profile-info kısmını yeniden çiz
+
+      // Sadece profile-info kısmını yeniden çiz (partial re-render)
       const profileInfo = document.querySelector('.profile-info');
       profileInfo.innerHTML = `
         <h2>${escapeHtml(updated.username)}</h2>
@@ -161,7 +164,7 @@ export async function renderProfile(app) {
           ${updated.favoriteTeam ? `<span class="fav-pill team">🏁 ${updated.favoriteTeam}</span>` : ''}
         </div>
       `;
-  
+
       toast('Profil güncellendi 🏁', 'success');
       btn.disabled = false;
       btn.textContent = '💾 Kaydet';
