@@ -93,6 +93,8 @@ export const predictions = {
     api('POST', `/leagues/${leagueId}/races/${raceId}/predictions`, data),
   getMine: (leagueId, raceId) =>
     api('GET', `/leagues/${leagueId}/races/${raceId}/predictions/me`),
+  getAll: (leagueId, raceId) =>
+    api('GET', `/leagues/${leagueId}/races/${raceId}/predictions`),
   update: (id, data) => api('PUT', `/predictions/${id}`, data),
   delete: (id) => api('DELETE', `/predictions/${id}`),
 };

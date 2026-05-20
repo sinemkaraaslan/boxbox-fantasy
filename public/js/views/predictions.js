@@ -420,7 +420,7 @@ function attachSubmitHandlers(leagueId, raceId, existing, state) {
 }
 
 //RESULTS VIEW — yarış sonuçlandı + tahmin var
-function renderResultsView(app, league, race, prediction) {
+async function renderResultsView(app, league, race, prediction) {
   const bd = prediction.pointsBreakdown || {};
   const actual = race.finalResults || [];
 
@@ -504,7 +504,50 @@ function renderResultsView(app, league, race, prediction) {
         </div>
       </div>
     </div>
+
+    <div id="leaguePredictions" style="margin-top: 2rem;"></div>
   `;
+
+  // Ligdeki tüm tahminleri yükle (güvenli — hata olursa ana ekran etkilenmez)
+  try {
+    const allPredictions = await predictions.getAll(league.id, race.id);
+    const container = document.getElementById('leaguePredictions');
+    if (!container || allPredictions.length === 0) return;
+
+    container.innerHTML = `
+      <div class="section-title">
+        <span class="section-title-bar"></span>
+        🏆 Ligdeki Tüm Tahminler
+      </div>
+      <div class="standings">
+        <div class="standings-header">
+          <div>Sıra</div>
+          <div>Oyuncu</div>
+          <div>Puan</div>
+        </div>
+        ${allPredictions.map((p, i) => {
+          const isMe = p.userId === prediction.userId;
+          return `
+            <div class="standings-row ${i === 0 ? 'rank-1' : ''}" ${isMe ? 'style="background: rgba(225, 6, 0, 0.06);"' : ''}>
+              <div class="standings-rank rank-${i + 1}">${i + 1}</div>
+              <div class="standings-name-row">
+                <div class="standings-name-avatar">${(p.User?.username || '?')[0].toUpperCase()}</div>
+                <div>
+                  <div class="standings-name">${escapeHtml(p.User?.username || 'Bilinmeyen')} ${isMe ? '<span class="text-mute" style="font-size:0.75rem;">(sen)</span>' : ''}</div>
+                  <div class="ph-podium" style="margin-top: 0.3rem;">
+                    ${p.podiumOrder.slice(0, 3).map(d => `<span class="ph-driver">${d}</span>`).join('')}
+                  </div>
+                </div>
+              </div>
+              <div class="standings-points">${p.pointsAwarded}<span class="standings-points-label">puan</span></div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  } catch (err) {
+    console.error('Ligdeki tahminler yüklenemedi:', err.message);
+  }
 }
 
 //MISSED RACE VIEW

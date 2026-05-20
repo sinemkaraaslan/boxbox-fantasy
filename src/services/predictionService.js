@@ -86,8 +86,8 @@ async function getRacePredictions(userId, leagueId, raceId) {
     throw new Error('RACE_NOT_FOUND');
   }
 
-  //Tahmin süresi hâlâ açıksa diğerlerini gösterme
-  if (isPredictionOpen(race)) {
+  //Tahmin süresi açık VE yarış bitmemişse diğerlerini gösterme
+  if (isPredictionOpen(race) && !race.isCompleted) {
     throw new Error('PREDICTIONS_LOCKED');
   }
 
