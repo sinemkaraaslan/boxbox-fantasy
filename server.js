@@ -2,6 +2,7 @@ require('dotenv').config();
 
 const app = require('./src/app');
 const { sequelize } = require('./src/models');
+const { startRaceResultsCron } = require('./src/jobs/raceResultsCron');
 
 const PORT = process.env.PORT || 3000;
 
@@ -16,6 +17,7 @@ async function start() {
     app.listen(PORT, () => {
       console.log(`Sunucu http://localhost:${PORT}`);
     });
+    startRaceResultsCron();
   } catch (err) {
     console.error('Hata:', err);
   }

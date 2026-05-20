@@ -15,7 +15,7 @@ app.use(helmet());
 //Genel rate limit: IP başına 15 dakikada 100 istek
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: 300,
   message: { error: 'Çok fazla istek, lütfen biraz sonra dene' }
 });
 app.use('/api/', generalLimiter);
